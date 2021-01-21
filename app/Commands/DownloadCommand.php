@@ -6,6 +6,7 @@ use Facebook\WebDriver\Remote\DesiredCapabilities;
 use Facebook\WebDriver\WebDriverBy;
 use Facebook\WebDriver\WebDriverExpectedCondition;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Support\Facades\Cache;
 use LaravelZero\Framework\Commands\Command;
 
 use Facebook\WebDriver\Remote\RemoteWebDriver;
@@ -25,6 +26,12 @@ class DownloadCommand extends Command
      * @var string
      */
     protected $description = 'Display an inspiring quote';
+    /**
+     * The description of the command.
+     *
+     * @var string
+     */
+    protected $token = 'Display an inspiring quote';
 
     /**
      * Execute the console command.
@@ -38,10 +45,12 @@ class DownloadCommand extends Command
         $serverUrl = 'http://localhost:4444';
         $driver = RemoteWebDriver::create($serverUrl, DesiredCapabilities::chrome());
 
+        $this->token = Cache::remember('token', 1000, function () use ($driver) {
+            return $this->login($driver);
+        });
+        dd($this->token);
 
-        $this->login($driver);
         $this->get_modules_list($driver);
-
 
     }
 
@@ -50,11 +59,13 @@ class DownloadCommand extends Command
      */
     private function login(RemoteWebDriver $driver)
     {
-        $driver->get(sprintf("https://%s.club.hotmart.com", env('DOMAIN')));
+        $driver->get("https://acasadedavi.club.hotmart.com/login");
         // Find search element by its id, write 'PHP' inside and submit
         $driver->findElement(WebDriverBy::name('login'))->sendKeys(env('LOGIN'));
         $driver->findElement(WebDriverBy::name('password'))->sendKeys(ENV('PASSWORD'));
         $driver->findElement(WebDriverBy::className('btn-login'))->click();
+        sleep(10);
+        return ($driver->manage()->getCookieNamed('hmVlcIntegration')->getValue());
     }
 
     /**
@@ -62,12 +73,8 @@ class DownloadCommand extends Command
      */
     private function get_modules_list(RemoteWebDriver $driver)
     {
-        // Find search element by its id, write 'PHP' inside and submit
-        $driver->wait(10, 1000);
 
-        file_put_contents('test.html', $driver->getPageSource());
-
-    }// Declare own callable function which could be passed to `$driver->wait()->until()`.
+    }
 
     function jqueryAjaxFinished(): callable
     {

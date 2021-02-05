@@ -5,6 +5,7 @@ namespace App\Commands;
 use Facebook\WebDriver\Remote\DesiredCapabilities;
 use Facebook\WebDriver\WebDriverBy;
 use Facebook\WebDriver\WebDriverExpectedCondition;
+use GuzzleHttp\Client;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Cache;
 use LaravelZero\Framework\Commands\Command;
@@ -48,7 +49,6 @@ class DownloadCommand extends Command
         $this->token = Cache::remember('token', 1000, function () use ($driver) {
             return $this->login($driver);
         });
-        dd($this->token);
 
         $this->get_modules_list($driver);
 
@@ -73,6 +73,56 @@ class DownloadCommand extends Command
      */
     private function get_modules_list(RemoteWebDriver $driver)
     {
+
+        $modules = Cache::remember('modules', 1000, function () use ($driver) {
+            $modules = new Client();
+            $response = $modules->get("https://api-club.hotmart.com/hot-club-api/rest/v3/navigation?newContentAmount=5", [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $this->token,
+                    'club'          => 'acasadedavi',
+                ]
+            ]);
+            return (json_decode($response->getBody()->getContents()));
+        });
+
+        foreach ($modules->modules as $module) {
+
+            foreach ($module->pages as $page) {
+
+                $page = Cache::remember("produto_{$page->hash}", 1000, function () use ($page) {
+                    $modules = new Client();
+                    $response = $modules->get("https://api-club.hotmart.com/hot-club-api/rest/v3/page/{$page->hash}", [
+                        'headers' => [
+                            'Authorization' => 'Bearer ' . $this->token,
+                            'club'          => 'acasadedavi',
+                        ]
+                    ]);
+                    return (json_decode($response->getBody()->getContents()));
+                });
+
+                foreach ($page->mediasSrc as $media) {
+//                    mkdir(storage_path("video_ts/{$media->mediaCode}"), 0755, true)
+
+                    $mp3_url = sprintf("https://contentplayer.hotmart.com/video/%s/hls/540/segment-%s.ts", $media->mediaCode, 1);
+                    $filename = storage_path(sprintf('video_ts/%s/%s.ts', $media->mediaCode, 1));
+
+                    $modules = new Client();
+                    $response = $modules->request("GET", "https://contentplayer.hotmart.com/video/prRAEBQ6R1/hls/540/segment-1.ts", [
+                        'headers' => [
+                            'Authorization' => 'Bearer ' . $this->token,
+                            'club'          => 'acasadedavi',
+                        ],
+                        'sink'    => $filename
+                    ]);
+
+
+                    dd($response->getBody()->getContents());
+//                    file_put_contents($filename, file_get_contents("https://contentplayer.hotmart.com/video/prRAEBQ6R1/hls/540/segment-1.ts"));
+                    die();
+                }
+            }
+        }
+
 
     }
 
